@@ -13,6 +13,7 @@ $Params = ConvertFrom-Json -InputObject $WebhookBody
 $subscriptionID = $Params.parameters.Subscriptionid.value   
 $subscriptionName = $Params.parameters.Subscriptionname.value
 
+# commented out
 # $templatesubsid = Get-AutomationVariable -Name "templatesubsid" 
 $templatesubsid = $subscriptionName
      
@@ -52,8 +53,8 @@ $templatesubsid = $subscriptionName
 	
 $ConfigurationBlobName = Get-AutomationVariable -Name "fwdConfigurationBlobName"
 $PackageBlobName = Get-AutomationVariable -Name "fwdPackageBlobName"
-	# $StorageAccountName = Get-AutomationVariable -Name "fwdpkgstorageaccount"
-	# $StorageContainerName = Get-AutomationVariable -Name "fwdpkgstoragecontaineraccount"
+# $StorageAccountName = Get-AutomationVariable -Name "fwdpkgstorageaccount"
+# $StorageContainerName = Get-AutomationVariable -Name "fwdpkgstoragecontaineraccount"
 $StorageAccountName = Get-AutomationVariable -Name "templatestorageaccount"
 $StorageContainerName = Get-AutomationVariable -Name "templatecontainer"
 	
@@ -81,10 +82,9 @@ $ResourceGroupLocation = Get-AutomationVariable -Name "fwdresourcegrouplocation"
 		
 $verbosePreference = "Continue"
 
-Write-Output "Getting Azure subscription $subscriptionName"
-Write-Output "Getting Azure subscription $subscriptionID"
+Write-Output "Getting Azure subscription name $subscriptionName and id $subscriptionID"
 Get-AzureSubscription -SubscriptionName $subscriptionName
-Write-Output "Selected Azure subscription"
+Write-Output "Finihsed getting Azure subscription"
 
 # Select Azure subscription
 Write-output "Selecting Azure Subscription..."
@@ -97,7 +97,7 @@ function Publish1()
    CreateStorageAccount2
    CreateCloudService1
       
-  Write-Output "Selecting packageLocation $packageLocation."
+  Write-Output "Selecting package location $packageLocation."
     
   Write-Output "$(Get-Date -f $timeStampFormat) - Publising Azure Deployment..."
   $deployment = Get-AzureDeployment -ServiceName $primarycloudService -Slot $slot -ErrorVariable a -ErrorAction silentlycontinue 
@@ -106,10 +106,13 @@ if ($a[0] -ne $null) {
     Write-Output "$(Get-Date -f $timeStampFormat) - No deployment is detected. Creating a new deployment. "
 }
 
- if ($deployment.Name -ne $null) {
+if ($deployment.Name -ne $null) 
+{
     Write-Output "$(Get-Date -f $timeStampFormat) - Deployment exists in $primarycloudService.  Upgrading deployment."
     UpgradeDeployment1
-} else {
+} 
+else 
+{
     CreateNewDeployment1
     Write-Output "Completed Deployment Successfully."
     $securePassword2 = ConvertTo-SecureString $Remoteuserpassword -AsPlainText -Force
@@ -117,7 +120,7 @@ if ($a[0] -ne $null) {
     $credential2 = New-Object System.Management.Automation.PSCredential $Remoteusername,$securepassword2
      
     Set-AzureServiceRemoteDesktopExtension -ServiceName $primarycloudService -Credential $credential2 -Expiration $expiry
-    }
+}
     Get-AzureServiceRemoteDesktopExtension -ServiceName $primarycloudService
 }
 
@@ -158,8 +161,6 @@ else
      Set-AzureStorageServiceMetricsProperty -MetricsLevel Service -RetentionDays -1 -ServiceType Blob -MetricsType Hour -Context $strCtxt
      Set-AzureStorageServiceMetricsProperty -MetricsLevel Service -RetentionDays -1 -ServiceType Table -MetricsType Hour -Context $strCtxt
 
-    
-
      Get-AzureStorageAccount -StorageAccountName $primaryStorageAccountName2
 }
 
@@ -180,159 +181,189 @@ function CreateCloudService1()
 
 function CreateNewDeployment1()
 {
-	Write-Output "Selecting Azure Subscription..."
-	Select-AzureSubscription -SubscriptionName  $templatesubsid
-	Write-Output "Selected Azure Subscription"
+	$subName = Get-AutomationVariable -Name "templateSubscriptionname"
+    Write-Output "Selecting Azure Subscription $subName"
+	Select-AzureSubscription -SubscriptionName  $subName
+	Write-Output "Selected Azure Subscription $subName"
  
- 	Write-Output "Getting storage account..."
-    $StorageAccount = (Get-AzureStorageAccount -StorageAccountName $StorageAccountName).Label
- 
-    Write-Output ('Setting the Azure Subscription and Storage Accounts')
- 	Write-Output "Selecting Azure Subscription..."
-    Set-AzureSubscription  -SubscriptionName $templatesubsid -CurrentStorageAccount $StorageAccount
- 
-         $TempFileLocation = "C:\$ConfigurationBlobName"
+ 	#Write-Output "Getting storage account..."
+    #$StorageAccount = (Get-AzureStorageAccount -StorageAccountName $StorageAccountName).Label
+    
+    #Write-Output ('Setting the Azure Subscription and Storage Accounts')
+    #Set-AzureSubscription  -SubscriptionName $templatesubsid -CurrentStorageAccount $StorageAccount
+    
+    try
+    {
+        $Conn = Get-AutomationConnection -Name AzureRunBookDevConnection
+        Add-AzureRMAccount -ServicePrincipal -Tenant $Conn.TenantID `
+            -ApplicationId $Conn.ApplicationID -CertificateThumbprint $Conn.CertificateThumbprint 
+        $templateSubscriptionid = Get-AutomationVariable -Name "templateSubscriptionid"
+        Set-AzureRmContext -SubscriptionId $templateSubscriptionid
+        $Container = Get-AutomationVariable -Name "templatecontainer"  
+        $templateresourcegroupname  = Get-AutomationVariable -Name "templateresourcegroupname"
+        $StorageAccount  = Get-AutomationVariable -Name "templatestorageaccount"
+        $StorageAccountKey=(Get-AzureRmStorageAccountKey -StorageAccountName $StorageAccount -ResourceGroupName $templateresourcegroupname).Key1
+        $StorageContext = New-AzureStorageContext $StorageAccount -StorageAccountKey $StorageAccountKey
         
+        #$StorageContext = SetStorageContext
+        
+        $TempFileLocation = "C:\$ConfigurationBlobName"
         $BlobFileLocation = "C:\$PackageBlobName"
- 
-        Write-Output ('Downloading Service Configurations from Azure Storage')
- 
+     
+        Write-Output ('CreateNewDeployment1: Downloading Service Configurations from Azure Storage')
+    
         Get-AzureStorageBlobContent `
             -Container $StorageContainerName `
-            -Blob  $ConfigurationBlobName `
+            -Blob $ConfigurationBlobName `
             -Destination $TempFileLocation `
+            -Context (New-AzureStorageContext $StorageAccount -StorageAccountKey $StorageAccountKey) `
             -Force
-            
+        
         Get-AzureStorageBlobContent `
             -Container $StorageContainerName `
             -Blob  $PackageBlobName `
             -Destination $BlobFileLocation `
+            -Context (New-AzureStorageContext $StorageAccount -StorageAccountKey $StorageAccountKey) `
             -Force
+    }
+    catch
+    {
+        Write-Output ('Failed getting storage account')
+        Write-Output ($_.Exception.Message)
+        exit
+    }
+    
+    
  
-        Write-Output('Downloaded Configuration File: '+ $TempFileLocation)
-        Write-Output('Downloaded Configuration File: '+ $BlobFileLocation)
- 
-        Write-Output('Getting Package Url from Azure Storage: '+ $PackageBlobName)
- 
-        $blob = $(Get-AzureStorageBlob -Blob $PackageBlobName -Container $StorageContainerName)
- 
-        $PackageUri = $blob.ICloudBlob.Uri.AbsoluteUri
- 
-        Write-Output('Package Url: '+ $PackageUri)
- 
-      
-        Write-Output('Attempting to Deploy the service')
-
-        
-          
- Write-Output "Selecting Azure Subscription..."
-Select-AzureSubscription -SubscriptionName $subscriptionName
-Write-Output "Selected Azure Subscription"
-
-  Write-Output "Getting Azure subscription $subscriptionName"
-Get-AzureSubscription -SubscriptionName $subscriptionName
-  Write-Output "Selected Azure subscription"
-
-
-# Select Azure subscription
-Write-output "Selecting Azure Subscription..."
-Select-AzureSubscription -SubscriptionName $subscriptionName
-Write-Output "Selected Azure Subscription "
- # Select Azure subscription
-
-  Set-AzureSubscription -SubscriptionName $subscriptionName -CurrentStorageAccount $primarystorageAccountName1
-            
-           New-AzureDeployment `
-                -Package $BlobFileLocation `
-                -Configuration $TempFileLocation `
-                -Slot Production `
-                -Label $deploymentLabelPrimary `
-                -ServiceName  $primarycloudService `
-                -Verbose                
+    try{
          
+     }
+     catch{
+         Write-Output "Error getting storage container."
+    	 exit
+     }
+ 
+    Write-Output('Downloaded configuration file to: '+ $TempFileLocation)
+    Write-Output('Downloaded package file to: '+ $BlobFileLocation)
+    Write-Output('Getting Package Url from Azure Storage: '+ $PackageBlobName)
+ 
+    # commenting out. not sure why this is needed
+    # $blob = $(Get-AzureStorageBlob -Blob $PackageBlobName -Container $StorageContainerName)
+    # $PackageUri = $blob.ICloudBlob.Uri.AbsoluteUri
+ 
+    # Write-Output('Package Url: '+ $PackageUri)
+    Write-Output('Attempting to Deploy the service')
+          
+    Write-Output "Selecting Azure Subscription..."
+    Select-AzureSubscription -SubscriptionName $subscriptionName
+    Write-Output "Selected Azure Subscription"
+    
+    Write-Output "Getting Azure subscription $subscriptionName"
+    Get-AzureSubscription -SubscriptionName $subscriptionName
+    Write-Output "Finihsed getting Azure subscription"
+
+
+    # commenting this out. Not sure why it is here twice
+    # Select Azure subscription
+    # Write-output "Selecting Azure Subscription..."
+    # Select-AzureSubscription -SubscriptionName $subscriptionName
+    # Write-Output "Selected Azure Subscription "
+    # Select Azure subscription
+
+    Set-AzureSubscription -SubscriptionName $subscriptionName -CurrentStorageAccount $primarystorageAccountName1
+            
+    New-AzureDeployment `
+        -Package $BlobFileLocation `
+        -Configuration $TempFileLocation `
+        -Slot Production `
+        -Label $deploymentLabelPrimary `
+        -ServiceName  $primarycloudService `
+        -Verbose                
 }
 
 function UpgradeDeployment1()
 {
 
-Write-Output "Selecting Azure Subscription..."
-Select-AzureSubscription -SubscriptionName $templatesubsid
-Write-Output "Selected Azure Subscription"
+    Write-Output "Selecting Azure Subscription..."
+    Select-AzureSubscription -SubscriptionName $templatesubsid
+    Write-Output "Selected Azure Subscription"
   
+    $StorageContext = SetStorageContext
+ 
+    # commenting out
+    #$StorageAccount = (Get-AzureStorageAccount -StorageAccountName $StorageAccountName).Label
+    #Write-output ('Setting the Azure Subscription and Storage Accounts')
+    #Set-AzureSubscription  -SubscriptionName $templatesubsid -CurrentStorageAccount $StorageAccount
+    
+    $Conn = Get-AutomationConnection -Name AzureRunBookDevConnection
+    Add-AzureRMAccount -ServicePrincipal -Tenant $Conn.TenantID `
+        -ApplicationId $Conn.ApplicationID -CertificateThumbprint $Conn.CertificateThumbprint 
+    $templateSubscriptionid = Get-AutomationVariable -Name "templateSubscriptionid"
+    Set-AzureRmContext -SubscriptionId $templateSubscriptionid
+    $Container = Get-AutomationVariable -Name "templatecontainer"  
+    $templateresourcegroupname  = Get-AutomationVariable -Name "templateresourcegroupname"
+    $StorageAccount  = Get-AutomationVariable -Name "templatestorageaccount"
+    $StorageAccountKey=(Get-AzureRmStorageAccountKey -StorageAccountName $StorageAccount -ResourceGroupName $templateresourcegroupname).Key1
+    #$StorageContext = New-AzureStorageContext $StorageAccount -StorageAccountKey $StorageAccountKey
+ 
+    $TempFileLocation = "C:\$ConfigurationBlobName"
+    $BlobFileLocation = "C:\$PackageBlobName"
+    Write-Output ('UpgradeDeployment1: Downloading Service Configurations from Azure Storage')
+ 
+    Get-AzureStorageBlobContent `
+        -Container $StorageContainerName `
+        -Blob  $ConfigurationBlobName `
+        -Destination $TempFileLocation `
+        -Context (New-AzureStorageContext $StorageAccount -StorageAccountKey $StorageAccountKey) `
+        -Force
+        
+    Get-AzureStorageBlobContent `
+        -Container $StorageContainerName `
+        -Blob  $PackageBlobName `
+        -Destination $BlobFileLocation `
+        -Context (New-AzureStorageContext $StorageAccount -StorageAccountKey $StorageAccountKey) `
+        -Force
+ 
+    Write-Output('Downloaded Configuration File: '+ $TempFileLocation)
+    Write-Output('Downloaded Configuration File: '+ $BlobFileLocation)
+    Write-Output('Getting Package Url from Azure Storage: '+ $PackageBlobName)
 
- 
-        $StorageAccount = (Get-AzureStorageAccount -StorageAccountName $StorageAccountName).Label
- 
-        Write-output ('Setting the Azure Subscription and Storage Accounts')
- 
-        Set-AzureSubscription  -SubscriptionName $templatesubsid -CurrentStorageAccount $StorageAccount
- 
- 
-        $TempFileLocation = "C:\$ConfigurationBlobName"
-        
-        $BlobFileLocation = "C:\$PackageBlobName"
- 
-        Write-Output ('Downloading Service Configurations from Azure Storage')
- 
-        Get-AzureStorageBlobContent `
-            -Container $StorageContainerName `
-            -Blob  $ConfigurationBlobName `
-            -Destination $TempFileLocation `
-            -Force
-            
-        Get-AzureStorageBlobContent `
-            -Container $StorageContainerName `
-            -Blob  $PackageBlobName `
-            -Destination $BlobFileLocation `
-            -Force
- 
-        Write-Output('Downloaded Configuration File: '+ $TempFileLocation)
-     
-        
-        Write-Output('Downloaded Configuration File: '+ $BlobFileLocation)
- 
-        Write-Output('Getting Package Url from Azure Storage: '+ $PackageBlobName)
- 
-        $blob = $(Get-AzureStorageBlob -Blob $PackageBlobName -Container $StorageContainerName)
- 
-        $PackageUri = $blob.ICloudBlob.Uri.AbsoluteUri
- 
-        Write-Output('Package Url: '+ $PackageUri)
- 
-      
-        Write-Output('Attempting to Deploy the service')
-
-        
+    #$blob = $(Get-AzureStorageBlob -Blob $PackageBlobName -Container $StorageContainerName)
+    #$PackageUri = $blob.ICloudBlob.Uri.AbsoluteUri
+    #Write-Output('Package Url: '+ $PackageUri)
+  
+    Write-Output('Attempting to Deploy the service')
           
- Write-Output "Selecting Azure Subscription..."
-#Select-AzureSubscription -SubscriptionName  $AzureSubscriptionName
-Write-Output "Selected Azure Subscription"
-Select-AzureSubscription -SubscriptionName $subscriptionName
-  Write-Output "Getting Azure subscription $subscriptionName"
-Get-AzureSubscription -SubscriptionName $subscriptionName
-  Write-Output "Selected Azure subscription"
+    Write-Output "Selecting Azure Subscription..."
+    #Select-AzureSubscription -SubscriptionName  $AzureSubscriptionName
+    Select-AzureSubscription -SubscriptionName $subscriptionName
+    Write-Output "Selected Azure Subscription"
 
-# Select Azure subscription
-Write-output "Selecting Azure Subscription..."
-Select-AzureSubscription -SubscriptionName $subscriptionName
-Write-Output "Selected Azure Subscription "
+    Write-Output "Getting Azure subscription $subscriptionName"
+    Get-AzureSubscription -SubscriptionName $subscriptionName
+    Write-Output "Selected Azure subscription"
+
+    # Select Azure subscription
+    Write-output "Selecting Azure Subscription..."
+    Select-AzureSubscription -SubscriptionName $subscriptionName
+    Write-Output "Selected Azure Subscription "
  
-  Set-AzureSubscription -SubscriptionName $subscriptionName -CurrentStorageAccount $primarystorageAccountName1
+    Set-AzureSubscription -SubscriptionName $subscriptionName -CurrentStorageAccount $primarystorageAccountName1
 
                  
-        Write-Output('Attempting to Update an Existing Deployment')
-            Set-AzureDeployment `
-                -Package $BlobFileLocation `
-                -Configuration $TempFileLocation `
-                -Slot Production `
-                -Mode Simultaneous `
-                -Label $deploymentLabelPrimary `
-                -ServiceName  $primarycloudService `
-                -Upgrade `
-                -Force `
-                -Verbose
+    Write-Output('Attempting to Update an Existing Deployment')
+        Set-AzureDeployment `
+            -Package $BlobFileLocation `
+            -Configuration $TempFileLocation `
+            -Slot Production `
+            -Mode Simultaneous `
+            -Label $deploymentLabelPrimary `
+            -ServiceName  $primarycloudService `
+            -Upgrade `
+            -Force `
+            -Verbose
                 
-            Write-Output('Attempting to Update an Existing Deployment')
+    Write-Output('Attempting to Update an Existing Deployment')
 }
 
 function Publish2()
@@ -426,158 +457,171 @@ function CreateCloudService2()
 
 function CreateNewDeployment2()
 {
-      Write-Output "Selecting Azure Subscription..."
-Select-AzureSubscription -SubscriptionName  $templatesubsid
-Write-Output "Selected Azure Subscription"
+    Write-Output "Selecting Azure Subscription..."
+    Select-AzureSubscription -SubscriptionName  $templatesubsid
+    Write-Output "Selected Azure Subscription"
 
+    #$StorageContext = SetStorageContext
+ 
+    # $StorageAccount = (Get-AzureStorageAccount -StorageAccountName $StorageAccountName).Label
+    # Write-Output ('Setting the Azure Subscription and Storage Accounts')
+    # Set-AzureSubscription  -SubscriptionName $templatesubsid -CurrentStorageAccount $StorageAccount
+    
+    $Conn = Get-AutomationConnection -Name AzureRunBookDevConnection
+    Add-AzureRMAccount -ServicePrincipal -Tenant $Conn.TenantID `
+        -ApplicationId $Conn.ApplicationID -CertificateThumbprint $Conn.CertificateThumbprint 
+    $templateSubscriptionid = Get-AutomationVariable -Name "templateSubscriptionid"
+    Set-AzureRmContext -SubscriptionId $templateSubscriptionid
+    $Container = Get-AutomationVariable -Name "templatecontainer"  
+    $templateresourcegroupname  = Get-AutomationVariable -Name "templateresourcegroupname"
+    $StorageAccount  = Get-AutomationVariable -Name "templatestorageaccount"
+    $StorageAccountKey=(Get-AzureRmStorageAccountKey -StorageAccountName $StorageAccount -ResourceGroupName $templateresourcegroupname).Key1
+    #$StorageContext = New-AzureStorageContext $StorageAccount -StorageAccountKey $StorageAccountKey
+ 
+    $TempFileLocation = "C:\$ConfigurationBlobName"
+    $BlobFileLocation = "C:\$PackageBlobName"
 
+    Write-Output ('CreateNewDeployment2: Downloading Service Configurations from Azure Storage')
  
-        $StorageAccount = (Get-AzureStorageAccount -StorageAccountName $StorageAccountName).Label
- 
-        Write-Output ('Setting the Azure Subscription and Storage Accounts')
- 
-        Set-AzureSubscription  -SubscriptionName $templatesubsid -CurrentStorageAccount $StorageAccount
- 
- 
-        $TempFileLocation = "C:\$ConfigurationBlobName"
+    Get-AzureStorageBlobContent `
+        -Container $StorageContainerName `
+        -Blob  $ConfigurationBlobName `
+        -Destination $TempFileLocation `
+        -Context (New-AzureStorageContext $StorageAccount -StorageAccountKey $StorageAccountKey) `
+        -Force
         
-        $BlobFileLocation = "C:\$PackageBlobName"
- 
-        Write-Output ('Downloading Service Configurations from Azure Storage')
- 
-        Get-AzureStorageBlobContent `
-            -Container $StorageContainerName `
-            -Blob  $ConfigurationBlobName `
-            -Destination $TempFileLocation `
-            -Force
-            
-        Get-AzureStorageBlobContent `
-            -Container $StorageContainerName `
-            -Blob  $PackageBlobName `
-            -Destination $BlobFileLocation `
-            -Force
+    Get-AzureStorageBlobContent `
+        -Container $StorageContainerName `
+        -Blob  $PackageBlobName `
+        -Destination $BlobFileLocation `
+        -Context (New-AzureStorageContext $StorageAccount -StorageAccountKey $StorageAccountKey) `
+        -Force
  
         Write-Output('Downloaded Configuration File: '+ $TempFileLocation)
-     
-        
         Write-Output('Downloaded Configuration File: '+ $BlobFileLocation)
- 
         Write-Output('Getting Package Url from Azure Storage: '+ $PackageBlobName)
  
-        $blob = $(Get-AzureStorageBlob -Blob $PackageBlobName -Container $StorageContainerName)
- 
-        $PackageUri = $blob.ICloudBlob.Uri.AbsoluteUri
- 
-        Write-Output('Package Url: '+ $PackageUri)
- 
+        # $blob = $(Get-AzureStorageBlob -Blob $PackageBlobName -Container $StorageContainerName)
+        # $PackageUri = $blob.ICloudBlob.Uri.AbsoluteUri
+        # Write-Output('Package Url: '+ $PackageUri)
       
         Write-Output('Attempting to Deploy the service')
 
-        
-          
- 
-  Write-Output "Getting Azure subscription $subscriptionName"
-Get-AzureSubscription -SubscriptionName $subscriptionName
-  Write-Output "Selected Azure subscription"
+    Write-Output "Getting Azure subscription $subscriptionName"
+    Get-AzureSubscription -SubscriptionName $subscriptionName
+    Write-Output "Selected Azure subscription"
 
-# Select Azure subscription
-Write-output "Selecting Azure Subscription..."
-Select-AzureSubscription -SubscriptionName $subscriptionName
-Write-Output "Selected Azure Subscription "
+    # Select Azure subscription
+    Write-output "Selecting Azure Subscription..."
+    Select-AzureSubscription -SubscriptionName $subscriptionName
+    Write-Output "Selected Azure Subscription "
  
-  Set-AzureSubscription `
+    Set-AzureSubscription `
             -SubscriptionName $subscriptionName `
             -CurrentStorageAccount $secondarystorageaccountName1
- 
-      
     
-         New-AzureDeployment `
-                -Package $BlobFileLocation `
-                -Configuration $TempFileLocation `
-                -Slot Production `
-                -Label $deploymentLabelsecondary `
-                -ServiceName  $secondarycloudService `
-                -Verbose
+     New-AzureDeployment `
+            -Package $BlobFileLocation `
+            -Configuration $TempFileLocation `
+            -Slot Production `
+            -Label $deploymentLabelsecondary `
+            -ServiceName  $secondarycloudService `
+            -Verbose
                 
-            Write-Output('Attempting to Update an Existing Deployment')
+    Write-Output('Attempting to Update an Existing Deployment')
 }
 
 function UpgradeDeployment2()
 {
     Write-Output "Selecting Azure Subscription..."
-Select-AzureSubscription -SubscriptionName  $templatesubsid
-Write-Output "Selected Azure Subscription"
+    Select-AzureSubscription -SubscriptionName  $templatesubsid
+    Write-Output "Selected Azure Subscription"
+ 
+    $StorageAccount = (Get-AzureStorageAccount -StorageAccountName $StorageAccountName).Label
 
- 
-        $StorageAccount = (Get-AzureStorageAccount -StorageAccountName $StorageAccountName).Label
- 
-        Write-Output ('Setting the Azure Subscription and Storage Accounts')
- 
-        Set-AzureSubscription  -SubscriptionName $templatesubsid -CurrentStorageAccount $StorageAccount
- 
-        $TempFileLocation = "C:\$ConfigurationBlobName"
-        
-        $BlobFileLocation = "C:\$PackageBlobName"
- 
-        Write-Output ('Downloading Service Configurations from Azure Storage')
- 
-        Get-AzureStorageBlobContent `
-            -Container $StorageContainerName `
-            -Blob  $ConfigurationBlobName `
-            -Destination $TempFileLocation `
-            -Force
+    Write-Output ('Setting the Azure Subscription and Storage Accounts')
+
+    Set-AzureSubscription  -SubscriptionName $templatesubsid -CurrentStorageAccount $StorageAccount
+
+    $TempFileLocation = "C:\$ConfigurationBlobName"
+    
+    $BlobFileLocation = "C:\$PackageBlobName"
+
+    Write-Output ('Downloading Service Configurations from Azure Storage')
+
+    Get-AzureStorageBlobContent `
+        -Container $StorageContainerName `
+        -Blob  $ConfigurationBlobName `
+        -Destination $TempFileLocation `
+        -Force
             
-        Get-AzureStorageBlobContent `
-            -Container $StorageContainerName `
-            -Blob  $PackageBlobName `
-            -Destination $BlobFileLocation `
-            -Force
+    Get-AzureStorageBlobContent `
+        -Container $StorageContainerName `
+        -Blob  $PackageBlobName `
+        -Destination $BlobFileLocation `
+        -Force
+
+    Write-Output('Downloaded Configuration File: '+ $TempFileLocation)
  
-        Write-Output('Downloaded Configuration File: '+ $TempFileLocation)
-     
-        
-        Write-Output('Downloaded Configuration File: '+ $BlobFileLocation)
+    
+    Write-Output('Downloaded Configuration File: '+ $BlobFileLocation)
  
-        Write-Output('Getting Package Url from Azure Storage: '+ $PackageBlobName)
- 
-        $blob = $(Get-AzureStorageBlob -Blob $PackageBlobName -Container $StorageContainerName)
- 
-        $PackageUri = $blob.ICloudBlob.Uri.AbsoluteUri
- 
-        Write-Output('Package Url: '+ $PackageUri)
- 
-      
-        Write-Output('Attempting to Deploy the service')
+    Write-Output('Getting Package Url from Azure Storage: '+ $PackageBlobName)
+
+    $blob = $(Get-AzureStorageBlob -Blob $PackageBlobName -Container $StorageContainerName)
+
+    $PackageUri = $blob.ICloudBlob.Uri.AbsoluteUri
+
+    Write-Output('Package Url: '+ $PackageUri)
+
+  
+    Write-Output('Attempting to Deploy the service')
 
         
 
-  Write-Output "Getting Azure subscription $subscriptionName"
-Get-AzureSubscription -SubscriptionName $subscriptionName
-  Write-Output "Selected Azure subscription"
+    Write-Output "Getting Azure subscription $subscriptionName"
+    Get-AzureSubscription -SubscriptionName $subscriptionName
+    Write-Output "Selected Azure subscription"
 
-# Select Azure subscription
-Write-output "Selecting Azure Subscription..."
-Select-AzureSubscription -SubscriptionName $subscriptionName
-Write-Output "Selected Azure Subscription "
+    # Select Azure subscription
+    Write-output "Selecting Azure Subscription..."
+    Select-AzureSubscription -SubscriptionName $subscriptionName
+    Write-Output "Selected Azure Subscription "
  
-  Set-AzureSubscription `
+    Set-AzureSubscription `
             -SubscriptionName $subscriptionName `
             -CurrentStorageAccount $secondarystorageAccountName1
 
                  
-       Write-Output('Attempting to Update an Existing Deployment')
-            Set-AzureDeployment `
-                -Package $BlobFileLocation `
-                -Configuration $TempFileLocation `
-                -Slot Production `
-                -Mode Simultaneous `
-                -Label $deploymentLabelsecondary `
-                -ServiceName  $secondarycloudService `
-                -Upgrade `
-                -Force `
-                -Verbose
-                
-            Write-Output('Attempting to Update an Existing Deployment')
+    Write-Output('Attempting to Update an Existing Deployment')
+        Set-AzureDeployment `
+            -Package $BlobFileLocation `
+            -Configuration $TempFileLocation `
+            -Slot Production `
+            -Mode Simultaneous `
+            -Label $deploymentLabelsecondary `
+            -ServiceName  $secondarycloudService `
+            -Upgrade `
+            -Force `
+            -Verbose
+            
+    Write-Output('Attempting to Update an Existing Deployment')
+}
+
+function SetStorageContext()
+{
+    $Conn = Get-AutomationConnection -Name AzureRunBookDevConnection
+    Add-AzureRMAccount -ServicePrincipal -Tenant $Conn.TenantID `
+        -ApplicationId $Conn.ApplicationID -CertificateThumbprint $Conn.CertificateThumbprint 
+    $templateSubscriptionid = Get-AutomationVariable -Name "templateSubscriptionid"
+    Set-AzureRmContext -SubscriptionId $templateSubscriptionid
+    $Container = Get-AutomationVariable -Name "templatecontainer"  
+    $templateresourcegroupname  = Get-AutomationVariable -Name "templateresourcegroupname"
+    $StorageAccount  = Get-AutomationVariable -Name "templatestorageaccount"
+    $StorageAccountKey=(Get-AzureRmStorageAccountKey -StorageAccountName $StorageAccount -ResourceGroupName $templateresourcegroupname).Key1
+    $StorageContext = New-AzureStorageContext $StorageAccount -StorageAccountKey $StorageAccountKey
+    
+    $StorageContext
 }
 
 try{
