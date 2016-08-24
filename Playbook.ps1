@@ -11,16 +11,16 @@ Param (
 
 Write-Output "Json Data received is $WebhookBody"
 	 
-$subscriptionID =  $Params.parameters.Subscriptionid.value
+$subscriptionID =  $Params.parameters.Subscriptionid 
 Write-Output "Subscription Id is $subscriptionID"
      
- $AutomationCredentialAssetName = $Params.parameters.AutomationCredentialAssetName.value
+ $AutomationCredentialAssetName = $Params.parameters.AutomationCredentialAssetName
  Write-Output "AutomationCredentialAssetName Id is $AutomationCredentialAssetName"
    
  
  try
  { 
- $cred = Get-AutomationPSCredential -Name $AutomationCredentialAssetName 
+ $cred = Get-AutomationPSCredential -Name $AutomationCredentialAssetName
  Add-AzureRmAccount -Credential $cred -SubscriptionId $subscriptionID  
  Set-AzureRmContext -SubscriptionId $subscriptionID
  }
@@ -62,15 +62,15 @@ Add-AzureRMAccount -ServicePrincipal -Tenant $Conn.TenantID `
 $Container = Get-AutomationVariable -Name "templatecontainer"  
 $templateresourcegroupname  = Get-AutomationVariable -Name "templateresourcegroupname"
 $StorageAccount  = Get-AutomationVariable -Name "templatestorageaccount"
- 
+ $ResourceGroupName = $Params.parameters.DeploymentResourceGroupName 
  $StorageAccountKey=(Get-AzureRmStorageAccountKey -StorageAccountName $StorageAccount -ResourceGroupName $templateresourcegroupname).Key1
 
  $StorageContext = New-AzureStorageContext $StorageAccount -StorageAccountKey $StorageAccountKey
 
 
  Set-AzureRmContext -SubscriptionId $subscriptionID 
- $ResourceGroupName = $Params.parameters.DeploymentResourceGroupName.value 
- $ResourceGroupLocation = $Params.parameters.DeploymentResourceGroupLocation.value 
+ 
+ $ResourceGroupLocation = Get-AutomationVariable -Name "primarylocation"
  New-AzureRmResourceGroup -Name $ResourceGroupName -Location $ResourceGroupLocation -Verbose -Force -ErrorAction Stop
 
 
@@ -86,7 +86,7 @@ Write-Output "$PrimaryTemplateFile"
 Write-Output "$SecondaryTemplateFile"
 		
 $HashTable = @{}
-$Params.parameters.eventhubprimaryparameters | get-member -MemberType NoteProperty | Where-Object{ -not [string]::IsNullOrEmpty($Params.parameters.eventhubprimaryparameters."$($_.name)")} | ForEach-Object {$HashTable.add($_.name,$Params.parameters.eventhubprimaryparameters."$($_.name)")}
+$HashTable['PRIMARYSERVICEBUSNAMESPACENAME'] = $Params.parameters.PRIMARYSERVICEBUSNAMESPACENAME 
 
 $PRIMARYSERVICEBUSEVENTHUBNAME = Get-AutomationVariable -Name "PRIMARYSERVICEBUSEVENTHUBNAME"
 $PRIMARYSERVICEBUSCONSUMERGROUPNAME1 = Get-AutomationVariable -Name "PRIMARYSERVICEBUSCONSUMERGROUPNAME1"
@@ -108,7 +108,9 @@ New-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Templa
 
 
 $HashTable = @{}
-$Params.parameters.eventhubsecondaryparameters | get-member -MemberType NoteProperty | Where-Object{ -not [string]::IsNullOrEmpty($Params.parameters.eventhubsecondaryparameters."$($_.name)")} | ForEach-Object {$HashTable.add($_.name,$Params.parameters.eventhubsecondaryparameters."$($_.name)")}
+
+$HashTable['SecondarySERVICEBUSNAMESPACENAME'] = $Params.parameters.SecondarySERVICEBUSNAMESPACENAME 
+
 $SecondarySERVICEBUSEVENTHUBNAME = Get-AutomationVariable -Name "PRIMARYSERVICEBUSEVENTHUBNAME"
 	$SecondarySERVICEBUSCONSUMERGROUPNAME1 = Get-AutomationVariable -Name "PRIMARYSERVICEBUSCONSUMERGROUPNAME1"
 		$SecondarySERVICEBUSCONSUMERGROUPNAME2 = Get-AutomationVariable -Name "PRIMARYSERVICEBUSCONSUMERGROUPNAME2"
@@ -146,7 +148,9 @@ Write-Output "Deployed EventHub Successfully"
  
 
 $HashTable = @{}
-$Params.parameters.servicebusqueuesparameters | get-member -MemberType NoteProperty | Where-Object{ -not [string]::IsNullOrEmpty($Params.parameters.servicebusqueuesparameters."$($_.name)")} | ForEach-Object {$HashTable.add($_.name,$Params.parameters.servicebusqueuesparameters."$($_.name)")}
+$HashTable['primaryServiceBusNamespace'] = $Params.parameters.primaryServiceBusNamespace 
+$HashTable['secondaryServiceBusNamespace'] = $Params.parameters.secondaryServiceBusNamespace 
+
 $serviceBusApiVersion = Get-AutomationVariable -Name "serviceBusApiVersion"
 	$primarylocation = Get-AutomationVariable -Name "primarylocation"
 		$secondarylocation = Get-AutomationVariable -Name "secondarylocation"
@@ -188,13 +192,16 @@ $serviceBusApiVersion = Get-AutomationVariable -Name "serviceBusApiVersion"
 	$HashTable.Add("duplicateDetectionHistoryTimeWindow10Min",$duplicateDetectionHistoryTimeWindow10Min)
 	
 $HashTable
+
 New-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -TemplateUri $PrimaryQueuesTemplateFile -TemplateParameterObject   $HashTable -Force -Verbose
 
 
 
 
 $HashTable = @{}
-$Params.parameters.servicebusqueuesparameters | get-member -MemberType NoteProperty | Where-Object{ -not [string]::IsNullOrEmpty($Params.parameters.servicebusqueuesparameters."$($_.name)")} | ForEach-Object {$HashTable.add($_.name,$Params.parameters.servicebusqueuesparameters."$($_.name)")}
+$HashTable['primaryServiceBusNamespace'] = $Params.parameters.primaryServiceBusNamespace 
+$HashTable['secondaryServiceBusNamespace'] = $Params.parameters.secondaryServiceBusNamespace 
+
 $serviceBusApiVersion = Get-AutomationVariable -Name "serviceBusApiVersion"
 	$primarylocation = Get-AutomationVariable -Name "primarylocation"
 		$secondarylocation = Get-AutomationVariable -Name "secondarylocation"
@@ -250,7 +257,7 @@ Write-Output "Deployed ServiceBusQueue Successfully"
  $SecondaryTemplateFile = New-AzureStorageBlobSASToken -Blob $SecondaryTemplateFile -Container $Container -Context $StorageContext -FullUri -Permission r
  
  $HashTable = @{}
-$Params.parameters.streamanalyticsprimaryparameters | get-member -MemberType NoteProperty | Where-Object{ -not [string]::IsNullOrEmpty($Params.parameters.streamanalyticsprimaryparameters."$($_.name)")} | ForEach-Object {$HashTable.add($_.name,$Params.parameters.streamanalyticsprimaryparameters."$($_.name)")}
+$HashTable['$jobName'] = $Params.parameters.streamanalyticsprimary 
 
 	$jobLocation = Get-AutomationVariable -Name "primarylocation"	
 	$outputStorageAccountKey = Get-AutomationVariable -Name "outputStorageAccountKey"
@@ -268,8 +275,8 @@ $Params.parameters.streamanalyticsprimaryparameters | get-member -MemberType Not
 	$HashTable.Add("outputTableName",$outputTableName)
 	$HashTable.Add("outputpartitionkeyName",$outputpartitionkeyName)
 	$HashTable.Add("outputRowkeyName",$outputRowkeyName)
-	$HashTable.Add("inputServiceBusNamespace",$Params.parameters.eventhubprimaryparameters.PRIMARYSERVICEBUSNAMESPACENAME)	
-	$HashTable.Add("outputStorageAccountName",$Params.parameters.primaryaccountname.value)
+	$HashTable.Add("inputServiceBusNamespace",$Params.parameters.PRIMARYSERVICEBUSNAMESPACENAME )	
+	$HashTable.Add("outputStorageAccountName",$Params.parameters.primaryaccountname )
     $HashTable.Add("inputEventHubName",$inputEventHubName)
 	$HashTable.Add("inputEventHubConsumerGroupName",$inputEventHubConsumerGroupName)
 	$HashTable.Add("inputEventHubSharedAccessPolicyName",$inputEventHubSharedAccessPolicyName)
@@ -279,7 +286,7 @@ $HashTable
 New-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -TemplateUri $PrimaryTemplateFile -TemplateParameterObject  $HashTable -Force -Verbose
 
 $HashTable = @{}
-$Params.parameters.streamanalyticssecondaryparameters | get-member -MemberType NoteProperty | Where-Object{ -not [string]::IsNullOrEmpty($Params.parameters.streamanalyticssecondaryparameters."$($_.name)")} | ForEach-Object {$HashTable.add($_.name,$Params.parameters.streamanalyticssecondaryparameters."$($_.name)")}
+$HashTable['$jobName'] = $Params.parameters.streamanalyticssecondary 
 
     $Secondary_jobLocation = Get-AutomationVariable -Name "Secondarylocation"
 	$Secondary_outputStorageAccountKey = Get-AutomationVariable -Name "Secondary_outputStorageAccountKey"
@@ -298,8 +305,8 @@ $Params.parameters.streamanalyticssecondaryparameters | get-member -MemberType N
 	$HashTable.Add("outputTableName",$outputTableName)
 	$HashTable.Add("outputpartitionkeyName",$outputpartitionkeyName)
 	$HashTable.Add("outputRowkeyName",$outputRowkeyName)
-    $HashTable.Add("inputServiceBusNamespace",$Params.parameters.eventhubsecondaryparameters.SecondarySERVICEBUSNAMESPACENAME)	
-	$HashTable.Add("outputStorageAccountName",$Params.parameters.secondaryaccountname.value)
+    $HashTable.Add("inputServiceBusNamespace",$Params.parameters.SecondarySERVICEBUSNAMESPACENAME )	
+	$HashTable.Add("outputStorageAccountName",$Params.parameters.secondaryaccountname )
 	$HashTable.Add("inputEventHubName",$inputEventHubName)
 	$HashTable.Add("inputEventHubConsumerGroupName",$inputEventHubConsumerGroupName)
 	$HashTable.Add("inputEventHubSharedAccessPolicyName",$inputEventHubSharedAccessPolicyName)
@@ -313,8 +320,8 @@ Write-Output "Deployed Streamanalytics Successfully"
 $location1 = Get-AutomationVariable -Name "primarylocation"
 $location2 =  Get-AutomationVariable -Name "Secondarylocation"
 
-$PrimaryAccountName = $Params.parameters.primaryaccountname.value
-$SecondaryAccountName =$Params.parameters.secondaryaccountname.value
+$PrimaryAccountName = $Params.parameters.primaryaccountname 
+$SecondaryAccountName =$Params.parameters.secondaryaccountname 
 
 $accountype = Get-AutomationVariable -Name "storageaccounttype"
 
