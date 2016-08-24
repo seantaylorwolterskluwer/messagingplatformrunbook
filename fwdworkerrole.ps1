@@ -10,14 +10,14 @@ $WebhookBody    =   $WebhookData.RequestBody
 $Params = ConvertFrom-Json -InputObject $WebhookBody
  
 
-$subscriptionID = $Params.parameters.Subscriptionid.value   
-$subscriptionName = $Params.parameters.Subscriptionname.value
+$subscriptionID = $Params.parameters.Subscriptionid   
+$subscriptionName = $Params.parameters.Subscriptionname
 
 # commented out
 # $templatesubsid = Get-AutomationVariable -Name "templatesubsid" 
 $templatesubsid = $subscriptionName
      
- $AutomationCredentialAssetName = $Params.parameters.AutomationCredentialAssetName.value
+ $AutomationCredentialAssetName = $Params.parameters.AutomationCredentialAssetName
     
     if($subscriptionName)
 	{
@@ -58,27 +58,27 @@ $PackageBlobName = Get-AutomationVariable -Name "fwdPackageBlobName"
 $StorageAccountName = Get-AutomationVariable -Name "templatestorageaccount"
 $StorageContainerName = Get-AutomationVariable -Name "templatecontainer"
 	
-$slot = $Params.parameters.fwddeploymentslot.value #staging or production
+$slot = $Params.parameters.fwddeploymentslot #staging or production
 $timeStampFormat = "g"
   
 $storageAccountType = Get-AutomationVariable -Name "fwdstorageaccounttype"
 $Remoteusername = Get-AutomationVariable -Name "fwdremoteusername"
 $Remoteuserpassword=Get-AutomationVariable -Name "fwdremoteuserpwd"
 
-$primaryStorageAccountName1 = $Params.parameters.fwdprimaryaccountname1.value
-$secondaryStorageAccountName1 = $Params.parameters.fwdsecondaryaccountname1.value
-$primaryStorageAccountName2 = $Params.parameters.fwdprimaryaccountname2.value
-$secondaryStorageAccountName2 = $Params.parameters.fwdsecondaryaccountname2.value
+$primaryStorageAccountName1 = $Params.parameters.fwdprimaryaccountname1
+$secondaryStorageAccountName1 = $Params.parameters.fwdsecondaryaccountname1
+$primaryStorageAccountName2 = $Params.parameters.fwdprimaryaccountname2
+$secondaryStorageAccountName2 = $Params.parameters.fwdsecondaryaccountname2
 $primaryLocation = Get-AutomationVariable -Name "primarylocation"
 $secondaryLocation = Get-AutomationVariable -Name "Secondarylocation"
-$primarycloudService = $Params.parameters.fwdprimarycloudService.value
+$primarycloudService = $Params.parameters.fwdprimarycloudService
 $deploymentLabelPrimary = "$primarycloudService - $(Get-Date -f $timeStampFormat)"
 
-$secondarycloudService = $Params.parameters.fwdsecondarycloudService.value
+$secondarycloudService = $Params.parameters.fwdsecondarycloudService
 $deploymentLabelSecondary = "$secondarycloudService - $(Get-Date -f $timeStampFormat)"
 
 $ResourceGroupName = Get-AutomationVariable -Name "fwdresourcegroupname"
-$ResourceGroupLocation = Get-AutomationVariable -Name "fwdresourcegrouplocation"
+$ResourceGroupLocation = Get-AutomationVariable -Name "primarylocation"
 		
 $verbosePreference = "Continue"
 
@@ -537,14 +537,22 @@ function UpgradeDeployment2()
     Select-AzureSubscription -SubscriptionName  $templatesubsid
     Write-Output "Selected Azure Subscription"
  
-    $StorageAccount = (Get-AzureStorageAccount -StorageAccountName $StorageAccountName).Label
-
-    Write-Output ('Setting the Azure Subscription and Storage Accounts')
-
-    Set-AzureSubscription  -SubscriptionName $templatesubsid -CurrentStorageAccount $StorageAccount
+    #$StorageAccount = (Get-AzureStorageAccount -StorageAccountName $StorageAccountName).Label
+    #Write-Output ('Setting the Azure Subscription and Storage Accounts')
+    #Set-AzureSubscription  -SubscriptionName $templatesubsid -CurrentStorageAccount $StorageAccount
+    
+    $Conn = Get-AutomationConnection -Name AzureRunBookDevConnection
+    Add-AzureRMAccount -ServicePrincipal -Tenant $Conn.TenantID `
+        -ApplicationId $Conn.ApplicationID -CertificateThumbprint $Conn.CertificateThumbprint 
+    $templateSubscriptionid = Get-AutomationVariable -Name "templateSubscriptionid"
+    Set-AzureRmContext -SubscriptionId $templateSubscriptionid
+    $Container = Get-AutomationVariable -Name "templatecontainer"  
+    $templateresourcegroupname  = Get-AutomationVariable -Name "templateresourcegroupname"
+    $StorageAccount  = Get-AutomationVariable -Name "templatestorageaccount"
+    $StorageAccountKey=(Get-AzureRmStorageAccountKey -StorageAccountName $StorageAccount -ResourceGroupName $templateresourcegroupname).Key1
+    #$StorageContext = New-AzureStorageContext $StorageAccount -StorageAccountKey $StorageAccountKey
 
     $TempFileLocation = "C:\$ConfigurationBlobName"
-    
     $BlobFileLocation = "C:\$PackageBlobName"
 
     Write-Output ('Downloading Service Configurations from Azure Storage')
@@ -553,32 +561,25 @@ function UpgradeDeployment2()
         -Container $StorageContainerName `
         -Blob  $ConfigurationBlobName `
         -Destination $TempFileLocation `
+        -Context (New-AzureStorageContext $StorageAccount -StorageAccountKey $StorageAccountKey) `
         -Force
             
     Get-AzureStorageBlobContent `
         -Container $StorageContainerName `
         -Blob  $PackageBlobName `
         -Destination $BlobFileLocation `
+        -Context (New-AzureStorageContext $StorageAccount -StorageAccountKey $StorageAccountKey) `
         -Force
 
     Write-Output('Downloaded Configuration File: '+ $TempFileLocation)
- 
-    
     Write-Output('Downloaded Configuration File: '+ $BlobFileLocation)
- 
     Write-Output('Getting Package Url from Azure Storage: '+ $PackageBlobName)
 
-    $blob = $(Get-AzureStorageBlob -Blob $PackageBlobName -Container $StorageContainerName)
-
-    $PackageUri = $blob.ICloudBlob.Uri.AbsoluteUri
-
-    Write-Output('Package Url: '+ $PackageUri)
-
-  
+    #$blob = $(Get-AzureStorageBlob -Blob $PackageBlobName -Container $StorageContainerName)
+    #$PackageUri = $blob.ICloudBlob.Uri.AbsoluteUri
+    #Write-Output('Package Url: '+ $PackageUri)
+    
     Write-Output('Attempting to Deploy the service')
-
-        
-
     Write-Output "Getting Azure subscription $subscriptionName"
     Get-AzureSubscription -SubscriptionName $subscriptionName
     Write-Output "Selected Azure subscription"
