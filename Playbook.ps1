@@ -326,9 +326,11 @@ $SecondaryAccountName =$Params.parameters.secondaryaccountname
 $accountype = Get-AutomationVariable -Name "storageaccounttype"
 
 $PrimarytableName1 = Get-AutomationVariable -Name "PrimarytableName1"
-$SecondarytableName1 =Get-AutomationVariable -Name "SecondarytableName1"
 $PrimarytableName2 = Get-AutomationVariable -Name "PrimarytableName2"
+$PrimarytableName3 = Get-AutomationVariable -Name "PrimarytableName3"
+$SecondarytableName1 =Get-AutomationVariable -Name "SecondarytableName1"
 $SecondarytableName2 = Get-AutomationVariable -Name "SecondarytableName2"
+$SecondarytableName3 = Get-AutomationVariable -Name "SecondarytableName3"
 
     
 $resource =  Find-AzureRmResource -ResourceType "Microsoft.Storage/storageAccounts" -ResourceNameContains  $PrimaryAccountName
@@ -346,6 +348,7 @@ if($resource -eq $null)
 
   New-AzureStorageTable -Name $PrimarytableName1 -Context $Ctx1
   New-AzureStorageTable -Name $PrimarytableName2 -Context $Ctx1
+  New-AzureStorageTable -Name $PrimarytableName3 -Context $Ctx1
 
 }
 else
@@ -368,6 +371,7 @@ if($resource -eq $null)
 
   New-AzureStorageTable -Name $SecondarytableName1 -Context $Ctx2
   New-AzureStorageTable -Name $SecondarytableName2 -Context $Ctx2
+  New-AzureStorageTable -Name $SecondarytableName3 -Context $Ctx2
 
 }   
 else
