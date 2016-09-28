@@ -168,15 +168,20 @@ Write-Output "$SecondaryTemplateFile"
 		
 $HashTable = @{}
 $HashTable['ApplicationInsightsPrimary'] = $Params.parameters.ApplicationInsightsPrimary 
-$HashTable['ApplicationInsightsSecondary'] = $Params.parameters.ApplicationInsightsSecondary
 
 $primarylocation = Get-AutomationVariable -Name "primarylocation"
-$secondarylocation = Get-AutomationVariable -Name "secondarylocation"
 
 $HashTable.Add("primarylocation",$primarylocation)
-$HashTable.Add("secondarylocation",$secondarylocation)
 
 New-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -TemplateUri $PrimaryTemplateFile -TemplateParameterObject $HashTable -Force -Verbose
+
+$HashTable = @{}
+$HashTable['ApplicationInsightsSecondary'] = $Params.parameters.ApplicationInsightsSecondary
+
+$secondarylocation = Get-AutomationVariable -Name "secondarylocation"
+
+$HashTable.Add("secondarylocation",$secondarylocation)
+
 New-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -TemplateUri $SecondaryTemplateFile -TemplateParameterObject $HashTable -Force -Verbose
 #----------------------------------------------
 Write-Output "Deployed AppInsights Successfully"
