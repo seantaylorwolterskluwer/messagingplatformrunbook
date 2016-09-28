@@ -157,6 +157,7 @@ if ($NamespaceManager.EventHubExists($SecondarySERVICEBUSEVENTHUBNAME))
 Write-Output "Deployed EventHub Successfully"
 #---------------------------------------------------------------------------------------
 
+
 #--------BEGIN APPINSIGHTS----------------------------------------------------------
 $PrimaryTemplateFile = "AppInsightsPrimary.json"
 $SecondaryTemplateFile = "AppInsightsSecondary.json"
@@ -169,7 +170,13 @@ Write-Output "$SecondaryTemplateFile"
 $HashTable = @{}
 $HashTable['ApplicationInsightsPrimary'] = $Params.parameters.ApplicationInsightsPrimary 
 
+#$ApplicationInsightsPrimary = Get-AutomationVariable -Name "ApplicationInsightsPrimary"
+#$ApplicationInsightsSecondary = Get-AutomationVariable -Name "ApplicationInsightsSecondary"
+
 $aiLocation = Get-AutomationVariable -Name "aiLocation"
+
+#$HashTable.Add("ApplicationInsightsPrimary",$ApplicationInsightsPrimary)	
+#$HashTable.Add("ApplicationInsightsSecondary",$ApplicationInsightsSecondary)	
 
 $HashTable.Add("aiLocation",$aiLocation)
 
@@ -178,7 +185,13 @@ New-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Templa
 $HashTable = @{}
 $HashTable['ApplicationInsightsSecondary'] = $Params.parameters.ApplicationInsightsSecondary
 
+#$ApplicationInsightsPrimary = Get-AutomationVariable -Name "ApplicationInsightsPrimary"
+#$ApplicationInsightsSecondary = Get-AutomationVariable -Name "ApplicationInsightsSecondary"
+
 $aiLocation = Get-AutomationVariable -Name "aiLocation"
+
+#$HashTable.Add("ApplicationInsightsPrimary",$ApplicationInsightsPrimary)	
+#$HashTable.Add("ApplicationInsightsSecondary",$ApplicationInsightsSecondary)	
 
 $HashTable.Add("aiLocation",$aiLocation)
 
@@ -186,7 +199,6 @@ New-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Templa
 #----------------------------------------------
 Write-Output "Deployed AppInsights Successfully"
 #---------------------------------------------------------------------------------------
-
 
 #--------BEGIN SERVICE BUS----------------------------------------------------------
 $PrimaryQueuesTemplateFile = "ServiceBusForPrimaryQueues.json"
@@ -344,9 +356,23 @@ else
 
 	$Ctx1 = New-AzureStorageContext $PrimaryAccountName -StorageAccountKey $PrimaryStorageAccountKey
 
-	New-AzureStorageTable -Name $PrimarytableName1 -Context $Ctx1
-	New-AzureStorageTable -Name $PrimarytableName2 -Context $Ctx1
-	New-AzureStorageTable -Name $PrimarytableName3 -Context $Ctx1 
+	$table = Get-AzureStorageTable –Name $PrimarytableName1 -Context $Ctx1 -ErrorAction Ignore
+	if ($table -eq $null)
+	{
+		New-AzureStorageTable -Name $PrimarytableName1 -Context $Ctx1
+	}
+
+	$table = Get-AzureStorageTable –Name $PrimarytableName2 -Context $Ctx1 -ErrorAction Ignore
+	if ($table -eq $null)
+	{
+		New-AzureStorageTable -Name $PrimarytableName2 -Context $Ctx1
+	}
+	
+	$table = Get-AzureStorageTable –Name $PrimarytableName3 -Context $Ctx1 -ErrorAction Ignore
+	if ($table -eq $null)
+	{
+		New-AzureStorageTable -Name $PrimarytableName3 -Context $Ctx1
+	}
 }
 
 $resource =  Find-AzureRmResource -ResourceType "Microsoft.Storage/storageAccounts" -ResourceNameContains  $SecondaryAccountName
@@ -379,10 +405,24 @@ else
 	
 	$Ctx2 = New-AzureStorageContext $SecondaryAccountName -StorageAccountKey $SecondaryStorageAccountKey
 
-	New-AzureStorageTable -Name $SecondarytableName1 -Context $Ctx2
-	New-AzureStorageTable -Name $SecondarytableName2 -Context $Ctx2
-	New-AzureStorageTable -Name $SecondarytableName3 -Context $Ctx2  
-}        
+	$table = Get-AzureStorageTable –Name $SecondarytableName1 -Context $Ctx2 -ErrorAction Ignore
+	if ($table -eq $null)
+	{
+		New-AzureStorageTable -Name $SecondarytableName1 -Context $Ctx2
+	}
+
+	$table = Get-AzureStorageTable –Name $SecondarytableName2 -Context $Ctx2 -ErrorAction Ignore
+	if ($table -eq $null)
+	{
+		New-AzureStorageTable -Name $SecondarytableName2 -Context $Ctx2
+	}
+	
+	$table = Get-AzureStorageTable –Name $SecondarytableName3 -Context $Ctx2 -ErrorAction Ignore
+	if ($table -eq $null)
+	{
+		New-AzureStorageTable -Name $SecondarytableName3 -Context $Ctx2
+	}
+}
 
 Write-Output "Deployed storage tables successfully"
 #------END TABLE STORAGE-----------------------------------------------
@@ -424,7 +464,7 @@ New-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Templa
 Start-AzureRmStreamAnalyticsJob -ResourceGroupName $ResourceGroupName -Name $Params.parameters.streamanalyticsprimary #-OutputStartMode "JobStartTime" -OutputStartTime $JobStartDate
 
 $HashTable = @{}
-$HashTable['jobName'] = $Params.parameters.streamanalyticssecondary 
+$HashTable['jobName'] = $Params.parameters.streamanalyticssecondary
 
 $Secondary_jobLocation = Get-AutomationVariable -Name "Secondarylocation"
 $Secondary_outputpartitionkeyName = Get-AutomationVariable -Name "outputpartitionkeyName"
