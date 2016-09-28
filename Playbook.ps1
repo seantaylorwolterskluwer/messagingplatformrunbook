@@ -169,18 +169,18 @@ Write-Output "$SecondaryTemplateFile"
 $HashTable = @{}
 $HashTable['ApplicationInsightsPrimary'] = $Params.parameters.ApplicationInsightsPrimary 
 
-$primarylocation = Get-AutomationVariable -Name "primarylocation"
+$aiLocation = Get-AutomationVariable -Name "aiLocation"
 
-$HashTable.Add("primarylocation",$primarylocation)
+$HashTable.Add("aiLocation",$aiLocation)
 
 New-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -TemplateUri $PrimaryTemplateFile -TemplateParameterObject $HashTable -Force -Verbose
 
 $HashTable = @{}
 $HashTable['ApplicationInsightsSecondary'] = $Params.parameters.ApplicationInsightsSecondary
 
-$secondarylocation = Get-AutomationVariable -Name "secondarylocation"
+$aiLocation = Get-AutomationVariable -Name "aiLocation"
 
-$HashTable.Add("secondarylocation",$secondarylocation)
+$HashTable.Add("aiLocation",$aiLocation)
 
 New-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -TemplateUri $SecondaryTemplateFile -TemplateParameterObject $HashTable -Force -Verbose
 #----------------------------------------------
