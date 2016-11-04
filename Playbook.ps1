@@ -148,9 +148,11 @@ $serviceBusApiVersion = Get-AutomationVariable -Name "serviceBusApiVersion"
 $primaryServiceBusQueue_alerts = Get-AutomationVariable -Name "primaryServiceBusQueue_alerts"
 $primaryServiceBusQueue_emails = Get-AutomationVariable -Name "primaryServiceBusQueue_emails"
 $primaryServiceBusQueue_errors = Get-AutomationVariable -Name "primaryServiceBusQueue_errors"
+$primaryServiceBusQueue_appinsights = Get-AutomationVariable -Name "primaryServiceBusQueue_appinsights"
 $secondaryServiceBusQueue_alerts = Get-AutomationVariable -Name "primaryServiceBusQueue_alerts"
 $secondaryServiceBusQueue_emails = Get-AutomationVariable -Name "primaryServiceBusQueue_emails"
 $secondaryServiceBusQueue_errors = Get-AutomationVariable -Name "primaryServiceBusQueue_errors"
+$secondaryServiceBusQueue_appinsights = Get-AutomationVariable -Name "primaryServiceBusQueue_appinsights"
 $defaultMessageTimeToLive7Days = Get-AutomationVariable -Name "defaultMessageTimeToLive7Days"
 $maxSizeInMegabytes16GB = Get-AutomationVariable -Name "maxSizeInMegabytes16GB"
 $deadLetteringOnMessageExpirationTrue = Get-AutomationVariable -Name "deadLetteringOnMessageExpirationTrue"
@@ -167,6 +169,7 @@ $HashTable.Add("primarylocation", $deploymentLocation)
 $HashTable.Add("primaryServiceBusQueue_alerts",$primaryServiceBusQueue_alerts)
 $HashTable.Add("primaryServiceBusQueue_emails",$primaryServiceBusQueue_emails)
 $HashTable.Add("primaryServiceBusQueue_errors",$primaryServiceBusQueue_errors)
+$HashTable.Add("primaryServiceBusQueue_appinsights",$primaryServiceBusQueue_appinsights)
 $HashTable.Add("defaultMessageTimeToLive7Days",$defaultMessageTimeToLive7Days)
 $HashTable.Add("maxSizeInMegabytes16GB",$maxSizeInMegabytes16GB)
 $HashTable.Add("deadLetteringOnMessageExpirationTrue",$deadLetteringOnMessageExpirationTrue)
@@ -280,4 +283,39 @@ New-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Templa
 Start-AzureRmStreamAnalyticsJob -ResourceGroupName $ResourceGroupName -Name $Params.parameters.streamanalyticsprimary #-OutputStartMode "JobStartTime" -OutputStartTime $JobStartDate
 
 Write-Output "Deployed stream analytics successfully"
+Write-Output "Finished running script"
+
+# ---- Stream Analytics Jobs For App Insights-------------------------------------------------------------------------------
+Write-Output "Starting deployment of stream analytics jobs for app insights"
+$PrimaryTemplateFile = "SA_AppInsights_EUS.json"    
+$SecondaryTemplateFile = "SA_AppInsights_WUS.json"
+$JobStartDate = Get-Date -Format o
+ 
+$PrimaryTemplateFile = New-AzureStorageBlobSASToken -Blob $PrimaryTemplateFile -Container $Container -Context $StorageContext -FullUri -Permission r 
+ 
+$HashTable = @{}
+$HashTable['jobName'] = $Params.parameters.streamanalyticsaiqprimary 
+
+$outputQueueName = Get-AutomationVariable -Name "primaryServiceBusQueue_appinsights"
+$outputQueueSharedAccessPolicyName = Get-AutomationVariable -Name "outputQueueSharedAccessPolicyName"
+$inputEventHubName = Get-AutomationVariable -Name "inputEventHubName"
+$inputEventHubConsumerGroupName = Get-AutomationVariable -Name "inputEventHubConsumerGroupName"
+$inputEventHubSharedAccessPolicyName = Get-AutomationVariable -Name "inputEventHubSharedAccessPolicyName"
+
+$HashTable.Add("jobLocation", $deploymentLocation)	
+$HashTable.Add("outputServiceBusNamespace",$Params.parameters.primaryServiceBusNamespace)
+$HashTable.Add("outputQueueName",$outputQueueName)
+$HashTable.Add("outputQueueSharedAccessPolicyName",$outputQueueSharedAccessPolicyName)
+$HashTable.Add("outputQueueSharedAccessPolicyKey",$Params.parameters.queue_primary_key)
+$HashTable.Add("inputServiceBusNamespace",$Params.parameters.PRIMARYSERVICEBUSNAMESPACENAME )	
+$HashTable.Add("inputEventHubName",$inputEventHubName)
+$HashTable.Add("inputEventHubConsumerGroupName",$inputEventHubConsumerGroupName)
+$HashTable.Add("inputEventHubSharedAccessPolicyName",$inputEventHubSharedAccessPolicyName)
+$HashTable.Add("inputEventHubSharedAccessPolicyKey",$eventHubPrimaryKey)
+
+$HashTable
+New-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -TemplateUri $PrimaryTemplateFile -TemplateParameterObject  $HashTable -Force -Verbose
+Start-AzureRmStreamAnalyticsJob -ResourceGroupName $ResourceGroupName -Name $Params.parameters.streamanalyticsaiqprimary #-OutputStartMode "JobStartTime" -OutputStartTime $JobStartDate
+
+Write-Output "Deployed stream analytics successfully for app insights"
 Write-Output "Finished running script"
