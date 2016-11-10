@@ -112,8 +112,7 @@ if ($NamespaceManager.EventHubExists($PRIMARYSERVICEBUSEVENTHUBNAME))
     $eventHubPrimaryKey = $rule.PrimaryKey
     Write-Output "Event Hub primary key is $eventHubPrimaryKey"
 }
-#----------------------------------------------
-                      
+
 Write-Output "Deployed EventHub Successfully"
 #---------------------------------------------------------------------------------------
 
@@ -149,10 +148,6 @@ $primaryServiceBusQueue_alerts = Get-AutomationVariable -Name "primaryServiceBus
 $primaryServiceBusQueue_emails = Get-AutomationVariable -Name "primaryServiceBusQueue_emails"
 $primaryServiceBusQueue_errors = Get-AutomationVariable -Name "primaryServiceBusQueue_errors"
 $primaryServiceBusQueue_appinsights = Get-AutomationVariable -Name "primaryServiceBusQueue_appinsights"
-$secondaryServiceBusQueue_alerts = Get-AutomationVariable -Name "primaryServiceBusQueue_alerts"
-$secondaryServiceBusQueue_emails = Get-AutomationVariable -Name "primaryServiceBusQueue_emails"
-$secondaryServiceBusQueue_errors = Get-AutomationVariable -Name "primaryServiceBusQueue_errors"
-$secondaryServiceBusQueue_appinsights = Get-AutomationVariable -Name "primaryServiceBusQueue_appinsights"
 $defaultMessageTimeToLive7Days = Get-AutomationVariable -Name "defaultMessageTimeToLive7Days"
 $maxSizeInMegabytes16GB = Get-AutomationVariable -Name "maxSizeInMegabytes16GB"
 $deadLetteringOnMessageExpirationTrue = Get-AutomationVariable -Name "deadLetteringOnMessageExpirationTrue"
@@ -184,7 +179,18 @@ $HashTable
 New-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -TemplateUri $PrimaryQueuesTemplateFile -TemplateParameterObject   $HashTable -Force -Verbose
 
 
-Write-Output "Deployed Service Bus Successfully"
+Write-Output "Deployed Service Bus successfully"
+
+#---Service Bus queue key
+Write-Output "Retreiving Service Bus Queue Key"
+Add-AzureAccount -Credential $cred
+Select-AzureSubscription -SubscriptionId $subscriptionID
+ 
+$ServiceBusQueueNamespace = Get-AzureSBNamespace -Name $Params.parameters.primaryServiceBusNamespace
+$ServiceBusQueueKey = $ServiceBusQueueNamespace.ConnectionString.Split("{;}").Item(2).Remove(0,16)
+
+Write-Output "Service Bus primary key is" $ServiceBusQueueKey
+
 #--------END SERVICE BUS----------------------------------------------------------
 
 #-------BEGIN TABLE STORAGE------------------------------------------------------------
@@ -306,7 +312,7 @@ $HashTable.Add("jobLocation", $deploymentLocation)
 $HashTable.Add("outputServiceBusNamespace",$Params.parameters.primaryServiceBusNamespace)
 $HashTable.Add("outputQueueName",$outputQueueName)
 $HashTable.Add("outputQueueSharedAccessPolicyName",$outputQueueSharedAccessPolicyName)
-$HashTable.Add("outputQueueSharedAccessPolicyKey",$Params.parameters.queue_primary_key)
+$HashTable.Add("outputQueueSharedAccessPolicyKey",$ServiceBusQueueKey)
 $HashTable.Add("inputServiceBusNamespace",$Params.parameters.PRIMARYSERVICEBUSNAMESPACENAME )	
 $HashTable.Add("inputEventHubName",$inputEventHubName)
 $HashTable.Add("inputEventHubConsumerGroupName",$inputEventHubConsumerGroupName)
